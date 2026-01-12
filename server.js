@@ -190,6 +190,28 @@ Formato exacto:
   }
 });
 
+// ===============================
+// HARMONICS V2 – DrTrader System
+// Endpoint nuevo, no invasivo (versionado)
+// ===============================
+
+const HARMONICS_V2_ENABLED = (process.env.HARMONICS_V2_ENABLED || "false") === "true";
+
+app.post('/v2/analyze-image-harmonic', upload.single('image'), async (req, res) => {
+  if (!HARMONICS_V2_ENABLED) {
+    return res.status(503).json({
+      error: "Harmonics V2 disabled",
+      message: "El sistema DrTrader V2 está apagado por feature flag"
+    });
+  }
+
+  return res.json({
+    status: "Harmonics V2 online",
+    message: "Endpoint activo. Próximo paso: conectar OpenAI + scoring DrTrader.",
+    next: "Subir imagen y procesar patrones con puntuación B/XA prioritaria"
+  });
+});
+
 app.listen(port, () => {
   console.log(`Servidor IA escuchando en puerto ${port}`);
 });
