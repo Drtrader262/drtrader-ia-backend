@@ -195,7 +195,8 @@ Formato exacto:
 // Endpoint nuevo, no invasivo (versionado)
 // ===============================
 
-const HARMONICS_V2_ENABLED = (process.env.HARMONICS_V2_ENABLED || "false") === "true";
+const HARMONICS_V2_ENABLED = String(process.env.HARMONICS_V2_ENABLED || "false").trim().toLowerCase() === "true";
+
 // DEBUG temporal: ver qué valor real llega desde Render
 app.get('/debug/harmonics-v2', (req, res) => {
   const raw = process.env.HARMONICS_V2_ENABLED;
