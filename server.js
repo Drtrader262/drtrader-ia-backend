@@ -197,16 +197,7 @@ Formato exacto:
 
 const HARMONICS_V2_ENABLED = String(process.env.HARMONICS_V2_ENABLED || "false").trim().toLowerCase() === "true";
 
-// DEBUG temporal: ver qué valor real llega desde Render
-app.get('/debug/harmonics-v2', (req, res) => {
-  const raw = process.env.HARMONICS_V2_ENABLED;
-  const computed = String(raw ?? "").trim().toLowerCase() === "true";
-  res.json({
-    raw,
-    computed,
-    allEnvKeys: Object.keys(process.env).filter(k => k.includes("HARMONICS"))
-  });
-});
+
 
 app.post('/v2/analyze-image-harmonic', upload.single('image'), async (req, res) => {
   if (!HARMONICS_V2_ENABLED) {
