@@ -9,18 +9,33 @@ dotenv.config();
 const app = express();
 const upload = multer(); // archivos en memoria
 
-// Habilitar CORS para que el front (Netlify, etc.) pueda llamarte
+// Middlewares base
 app.use(cors());
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true }));
 
 // Cliente de OpenAI
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// ======================
+// Health + Root
+// ======================
+
 // Para probar rápido que el server anda
 app.get('/', (req, res) => {
   res.send('DR.TRADER IA backend OK');
 });
+
+// Health checks (Render / uptime monitors)
+app.get(['/health', '/salud'], (req, res) => {
+  res.status(200).json({ ok: true, service: 'drtrader-ia-backend' });
+});
+
+// ======================
+// Endpoint Mentor IA (texto + imagen)
+// ======================
 
 app.post('/api/analisis-ia', upload.single('image'), async (req, res) => {
   try {
@@ -38,7 +53,7 @@ app.post('/api/analisis-ia', upload.single('image'), async (req, res) => {
       content:
         'Sos un analista profesional de trading (Forex y sintéticos) y actuás como un mentor cercano pero serio. ' +
         'Evaluás análisis de operaciones: estructura de mercado, zonas, liquidez, patrones (armónicos, S&D, OB, FVG), gestión de riesgo. ' +
-        'Tu tarea: decir qué está bien, qué está mal o flojo, y sugerir mejoras claras. No des señales ni recomendaciones explícitas de inversión.'
+        'Tu tarea: decir qué está bien, qué está mal o flojo, y sugerir mejoras claras. No des señales ni recomendaciones explícitas de inversión.',
     });
 
     // Mensaje textual del usuario
@@ -70,12 +85,11 @@ app.post('/api/analisis-ia', upload.single('image'), async (req, res) => {
 
     // Llamada al modelo con visión (texto + imagen)
     const response = await client.responses.create({
-      model: 'gpt-4.1-mini', // o gpt-4.1 si querés
+      model: 'gpt-4.1-mini',
       input,
     });
 
     const replyText = response.output_text || 'No se pudo generar una respuesta.';
-
     return res.json({ reply: replyText });
   } catch (err) {
     console.error('Error en /api/analisis-ia:', err?.response?.data || err.message || err);
@@ -83,15 +97,10 @@ app.post('/api/analisis-ia', upload.single('image'), async (req, res) => {
   }
 });
 
-const port = process.env.PORT || 3000;
+// ======================
+// Detecta patrones armónicos (legacy)
+// ======================
 
-// Health checks (Render / uptime monitors)
-app.get(['/health', '/salud'], (req, res) => {
-  res.status(200).json({ ok: true, service: 'drtrader-ia-backend' });
-});
-
-// Detecta patrones armónicos desde una imagen (para el módulo VIP de Patrones Armónicos)
-// Devuelve hasta 2 patrones con puntos X,A,B,C,D listos para que el front calcule el score DrTrader.
 app.post('/api/harmonic-detect', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
@@ -135,10 +144,10 @@ Formato exacto:
           role: 'user',
           content: [
             { type: 'text', text: userText },
-            { type: 'image_url', image_url: { url: dataUrl } }
-          ]
-        }
-      ]
+            { type: 'image_url', image_url: { url: dataUrl } },
+          ],
+        },
+      ],
     });
 
     const raw = completion?.choices?.[0]?.message?.content || '';
@@ -165,25 +174,25 @@ Formato exacto:
           C: toNum(p.C),
           D: toNum(p.D),
           confidence: Number.isFinite(Number(p.confidence)) ? Number(p.confidence) : null,
-          notes: p.notes ? String(p.notes) : ''
+          notes: p.notes ? String(p.notes) : '',
         };
       });
     }
 
-    
     // Armamos un texto simple para el front (compatibilidad)
     let reply = '';
     if (parsed && Array.isArray(parsed.patterns) && parsed.patterns.length) {
-      reply = parsed.patterns.map((p, i) => {
-        const pts = `X=${p.X}, A=${p.A}, B=${p.B}, C=${p.C}, D=${p.D}`;
-        return `${i+1}) ${p.name} (${p.direction}) | ${pts} | conf=${p.confidence ?? ''}`;
-      }).join('\n');
+      reply = parsed.patterns
+        .map((p, i) => {
+          const pts = `X=${p.X}, A=${p.A}, B=${p.B}, C=${p.C}, D=${p.D}`;
+          return `${i + 1}) ${p.name} (${p.direction}) | ${pts} | conf=${p.confidence ?? ''}`;
+        })
+        .join('\n');
     } else {
       reply = 'No detecté patrones armónicos claros en la captura.';
     }
 
     return res.json({ reply, ...parsed });
-
   } catch (err) {
     console.error('Error /api/harmonic-detect:', err);
     return res.status(500).json({ error: 'Error interno analizando imagen' });
@@ -192,28 +201,114 @@ Formato exacto:
 
 // ===============================
 // HARMONICS V2 – DrTrader System
-// Endpoint nuevo, no invasivo (versionado)
+// Endpoint versionado: analiza imagen + devuelve JSON con score (B/XA prioritario)
 // ===============================
 
-const HARMONICS_V2_ENABLED = String(process.env.HARMONICS_V2_ENABLED || "false").trim().toLowerCase() === "true";
-
-
-
 app.post('/v2/analyze-image-harmonic', upload.single('image'), async (req, res) => {
-  if (!HARMONICS_V2_ENABLED) {
-    return res.status(503).json({
-      error: "Harmonics V2 disabled",
-      message: "El sistema DrTrader V2 está apagado por feature flag"
+  try {
+    // OJO: se evalúa en runtime (por request), así si cambiás env en Render, no queda “cacheado”
+    const HARMONICS_V2_ENABLED =
+      String(process.env.HARMONICS_V2_ENABLED || 'false').trim().toLowerCase() === 'true';
+
+    if (!HARMONICS_V2_ENABLED) {
+      return res.status(503).json({
+        error: 'Harmonics V2 disabled',
+        message: 'El sistema DrTrader V2 está apagado por feature flag',
+      });
+    }
+
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({
+        error: 'Missing image',
+        message: "Tenés que subir un archivo en el campo form-data 'image'",
+      });
+    }
+
+    const mime = req.file.mimetype || 'image/png';
+    const b64 = req.file.buffer.toString('base64');
+    const dataUrl = `data:${mime};base64,${b64}`;
+
+    // Prompt: candidatos + ratios + score (B/XA manda)
+    const prompt = `
+Devolvé SOLO JSON válido. Nada de texto extra.
+
+Objetivo: detectar TODOS los patrones armónicos posibles en una captura de TradingView/velas.
+Patrones permitidos: Gartley, Bat, Butterfly, Crab, Deep Crab, Shark, Cypher, 5-0 (y "Other" si aplica).
+Si no hay patrones claros, devolvé patterns: [].
+
+Reglas:
+- Proponé candidatos aunque no sean perfectos.
+- Para cada candidato: name, direction (bullish/bearish/unknown)
+- points: X,A,B,C,D como {x,y} en píxeles aproximados (si no se puede, poné null)
+- ratios: B_XA, C_AB, D_XA, D_BC (si no se puede calcular, null)
+- score 0..100. Peso mayor en B/XA.
+  Ponderación sugerida: B/XA=0.45, D/XA=0.25, C/AB=0.20, D/BC=0.10.
+- notes: breve explicación de por qué lo elegiste o qué faltó.
+
+Formato exacto:
+{
+  "patterns": [
+    {
+      "name": "Gartley|Bat|Butterfly|Crab|Deep Crab|Shark|Cypher|5-0|Other",
+      "direction": "bullish|bearish|unknown",
+      "points": { "X": {"x":0,"y":0}, "A": {"x":0,"y":0}, "B": {"x":0,"y":0}, "C": {"x":0,"y":0}, "D": {"x":0,"y":0} },
+      "ratios": { "B_XA": 0.618, "C_AB": 0.50, "D_XA": 0.786, "D_BC": 1.618 },
+      "score": 0,
+      "notes": ""
+    }
+  ],
+  "summary": ""
+}
+`;
+
+    const response = await client.responses.create({
+      model: 'gpt-4.1-mini',
+      input: [
+        {
+          role: 'user',
+          content: [
+            { type: 'input_text', text: prompt },
+            { type: 'input_image', image_url: dataUrl },
+          ],
+        },
+      ],
+    });
+
+    const text = response.output_text || '';
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      // Si el modelo no devolvió JSON perfecto, te devuelvo raw para ajustar prompt
+      return res.status(200).json({
+        ok: true,
+        warning: 'No pude parsear JSON. Devuelvo raw para depurar y ajustar prompt.',
+        raw: text,
+      });
+    }
+
+    const patterns = Array.isArray(parsed.patterns) ? parsed.patterns : [];
+    patterns.sort((a, b) => Number(b?.score || 0) - Number(a?.score || 0));
+
+    return res.json({
+      ok: true,
+      patterns,
+      summary: parsed.summary || '',
+    });
+  } catch (err) {
+    console.error('Error /v2/analyze-image-harmonic:', err?.response?.data || err.message || err);
+    return res.status(500).json({
+      error: 'Internal error',
+      message: 'Error interno analizando imagen con OpenAI',
     });
   }
-
-  return res.json({
-    status: "Harmonics V2 online",
-    message: "Endpoint activo. Próximo paso: conectar OpenAI + scoring DrTrader.",
-    next: "Subir imagen y procesar patrones con puntuación B/XA prioritaria"
-  });
 });
 
+// ======================
+// Listen
+// ======================
+
+const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`Servidor IA escuchando en puerto ${port}`);
 });
