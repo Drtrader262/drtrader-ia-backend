@@ -307,7 +307,6 @@ Formato exacto:
 // Telegram Alerts - Patrones PREMIUM
 // ======================
 
-// Para probar en navegador que la ruta existe
 app.get('/send-alert', (req, res) => {
   res.status(200).send('✅ Endpoint /send-alert activo. Usar POST para enviar alertas a Telegram.');
 });
@@ -324,24 +323,17 @@ app.post('/send-alert', async (req, res) => {
       });
     }
 
-    const {
-      message,
-      pattern,
-      score,
-      direction,
-      asset,
-      timeframe,
-    } = req.body || {};
+    const { message, pattern, score, direction, asset, timeframe } = req.body || {};
 
     const text =
       message ||
       🚨 PATRÓN PREMIUM DR.TRADER\n\n +
-        📌 Patrón: ${pattern || '-'}\n +
-        ⭐️ Score: ${score || '-'} / 100\n +
-        📈 Dirección: ${direction || '-'}\n +
-        💹 Activo: ${asset || '-'}\n +
-        ⏱️ Temporalidad: ${timeframe || '-'}\n\n +
-        ⚠️ Alerta informativa. Esperar confirmación antes de operar.;
+      📌 Patrón: ${pattern || '-'}\n +
+      ⭐️ Score: ${score || '-'} / 100\n +
+      📈 Dirección: ${direction || '-'}\n +
+      💹 Activo: ${asset || '-'}\n +
+      ⏱️ Temporalidad: ${timeframe || '-'}\n\n +
+      ⚠️ Alerta informativa. Esperar confirmación antes de operar.;
 
     const tgResponse = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
