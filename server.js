@@ -326,14 +326,16 @@ app.post('/send-alert', async (req, res) => {
     const { message, pattern, score, direction, asset, timeframe } = req.body || {};
 
     const text =
-      message ||
-      '🚨 PATRÓN PREMIUM DR.TRADER\n\n' +
-      📌 Patrón: ${pattern || '-'}\n +
-      ⭐️ Score: ${score || '-'} / 100\n +
-      📈 Dirección: ${direction || '-'}\n +
-      💹 Activo: ${asset || '-'}\n +
-      ⏱️ Temporalidad: ${timeframe || '-'}\n\n +
-      ⚠️ Alerta informativa. Esperar confirmación antes de operar.;
+  message ||
+  `🚨 PATRÓN PREMIUM DR.TRADER
+
+📌 Patrón: ${pattern || '-'}
+⭐️ Score: ${score || '-'} / 100
+📈 Dirección: ${direction || '-'}
+💹 Activo: ${asset || '-'}
+⏱️ Temporalidad: ${timeframe || '-'}
+
+⚠️ Alerta informativa. Esperar confirmación antes de operar.`;
 
     const tgResponse = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
