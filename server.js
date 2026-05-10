@@ -303,7 +303,79 @@ Formato exacto:
     });
   }
 });
+// ======================
+// Telegram Alerts - Patrones PREMIUM
+// ======================
 
+// Para probar en navegador que la ruta existe
+app.get('/send-alert', (req, res) => {
+  res.status(200).send('✅ Endpoint /send-alert activo. Usar POST para enviar alertas a Telegram.');
+});
+
+app.post('/send-alert', async (req, res) => {
+  try {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const chatId = process.env.TELEGRAM_CHAT_ID;
+
+    if (!token || !chatId) {
+      return res.status(500).json({
+        ok: false,
+        error: 'Faltan variables TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID en Render.',
+      });
+    }
+
+    const {
+      message,
+      pattern,
+      score,
+      direction,
+      asset,
+      timeframe,
+    } = req.body || {};
+
+    const text =
+      message ||
+      🚨 PATRÓN PREMIUM DR.TRADER\n\n +
+        📌 Patrón: ${pattern || '-'}\n +
+        ⭐️ Score: ${score || '-'} / 100\n +
+        📈 Dirección: ${direction || '-'}\n +
+        💹 Activo: ${asset || '-'}\n +
+        ⏱️ Temporalidad: ${timeframe || '-'}\n\n +
+        ⚠️ Alerta informativa. Esperar confirmación antes de operar.;
+
+    const tgResponse = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        disable_web_page_preview: true,
+      }),
+    });
+
+    const tgData = await tgResponse.json();
+
+    if (!tgData.ok) {
+      return res.status(500).json({
+        ok: false,
+        error: 'Telegram rechazó el mensaje.',
+        telegram: tgData,
+      });
+    }
+
+    return res.json({
+      ok: true,
+      sent: true,
+      telegram: tgData,
+    });
+  } catch (err) {
+    console.error('Error en /send-alert:', err);
+    return res.status(500).json({
+      ok: false,
+      error: err.message || 'Error enviando alerta a Telegram.',
+    });
+  }
+});
 // ======================
 // Listen
 // ======================
