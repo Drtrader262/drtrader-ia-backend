@@ -324,7 +324,6 @@ app.post('/send-alert', async (req, res) => {
     }
 
     const {
-  message,
   pattern,
   score,
   direction,
@@ -337,7 +336,6 @@ app.post('/send-alert', async (req, res) => {
 } = req.body || {};
 
 const text =
-  message ||
   `🚨 PATRÓN PREMIUM DR.TRADER
 
 📌 Patrón: ${pattern || '-'}
