@@ -323,19 +323,37 @@ app.post('/send-alert', async (req, res) => {
       });
     }
 
-    const { message, pattern, score, direction, asset, timeframe } = req.body || {};
+    const {
+  message,
+  pattern,
+  score,
+  direction,
+  asset,
+  timeFrame,
+  tp1,
+  tp2,
+  tp3,
+  stopLoss,
+} = req.body || {};
 
-    const text =
+const text =
   message ||
   `🚨 PATRÓN PREMIUM DR.TRADER
 
 📌 Patrón: ${pattern || '-'}
 ⭐️ Score: ${score || '-'} / 100
 📈 Dirección: ${direction || '-'}
-💹 Activo: ${asset || '-'}
-⏱️ Temporalidad: ${timeframe || '-'}
+💰 Activo: ${asset || '-'}
+🕒 Temporalidad: ${timeFrame || '-'}
 
-⚠️ Alerta informativa. Esperar confirmación antes de operar.`;
+🎯 TP1: ${tp1 || '-'}
+🎯 TP2: ${tp2 || '-'}
+🎯 TP3: ${tp3 || '-'}
+
+🛑 Stop Loss sugerido:
+${stopLoss || '-'}
+
+⚠️ Esperar confirmación institucional antes de operar.`;
 
     const tgResponse = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
